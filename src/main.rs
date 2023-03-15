@@ -2,10 +2,16 @@ use whisper_rs::{WhisperContext, FullParams, SamplingStrategy};
 use std::{time, env};
 use sfml::audio::{capture, SoundBufferRecorder};
 
+const THREADS: i32 = 8;
+const MODEL: &str = "medium"; // tested whisper models are medium and small
+const LANGUAGE: &str = "it"; // set language for whisper
+const REC_TIME: u64 = 8; // how many seconds the program listens for speech
+const DEBUG_LEVEL: i32 = 1;
 fn main() {
+    //model should be placed inside a folder {LINK_MOD_PATH}/whisper-{model}/ggml-model.bin
     let mod_path = match env::var("LINK_MOD_PATH"){
-        Ok(path) => format!("{}{}", path, "whisper-medium/ggml-model.bin"),
-        Err(e) => panic!("You must set env LINK_MOD_PATH to be the folder containing the models in ggml format: {:?}", e)
+        Ok(path) => format!("{}{}{}{}", path, "whisper-", MODEL, "/ggml-model.bin"),
+        Err(e) => panic!("You must set env LINK_MOD_PATH to be the folder containing the models in ggml format (see convert.py): {:?}", e)
     };
     // load a context and model
     let mut ctx = WhisperContext::new(mod_path.as_str()).expect("failed to load model");
@@ -14,9 +20,9 @@ fn main() {
     let mut params = FullParams::new(SamplingStrategy::Greedy { best_of: 1 });
 
     //other options
-    params.set_n_threads(8);
+    params.set_n_threads(THREADS);
     params.set_translate(false);
-    params.set_language(Some("it"));
+    params.set_language(Some(LANGUAGE));
     params.set_print_progress(false);
     /* 
     params.set_print_special(false);
@@ -25,7 +31,7 @@ fn main() {
     */
 
     // record_audio handles recording and outputs in the correct format (16KHz sampling rate, mono, 32 bit floats)
-    let audio_data = record_audio(time::Duration::from_secs(8));
+    let audio_data = record_audio(time::Duration::from_secs(REC_TIME));
 
 
     // run the model
@@ -69,11 +75,12 @@ fn record_audio(time: time::Duration) -> Vec<f32> {
     let buffer = recorder.buffer();
 
     // Display captured sound information
-    println!("Sound information :");
-    println!(" {} seconds", buffer.duration().as_seconds());
-    println!(" {} samples / sec", buffer.sample_rate());
-    println!(" {} channels", buffer.channel_count());
-
+    if DEBUG_LEVEL >= 1 {
+        println!("Sound information :");
+        println!(" {} seconds", buffer.duration().as_seconds());
+        println!(" {} samples / sec", buffer.sample_rate());
+        println!(" {} channels", buffer.channel_count());
+    }
     let mut samples = vec!();
     samples.extend_from_slice(buffer.samples());
 
